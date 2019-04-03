@@ -1,0 +1,11 @@
+{
+    "C_Cpp.dimInactiveRegions": false,
+    "files.associations": {
+        "iostream": "cpp",
+        "tuple": "cpp",
+        "iosfwd": "cpp",
+        "cmath": "cpp",
+        "vector": "cpp",
+        "new": "cpp"
+    }
+}
