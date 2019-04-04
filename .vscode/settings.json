@@ -6,6 +6,7 @@
         "iosfwd": "cpp",
         "cmath": "cpp",
         "vector": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "utility": "cpp"
     }
 }

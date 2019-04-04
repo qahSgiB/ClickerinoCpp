@@ -127,9 +127,24 @@ class Object {
 		vector<vector3d> points;
 		vector<tuple<tuple<int, int, int>, Material>> triangles;
 
-		Object() {}
+		Object() {};
 
 		Object(vector<vector3d> points, vector<tuple<tuple<int, int, int>, Material>> triangles): points(points), triangles(triangles) {}
+
+		static Object copy(Object object) {
+			vector<vector3d> points;
+			vector<tuple<tuple<int, int, int>, Material>> triangles;
+
+			for (vector<vector3d>::iterator point = object.points.begin(); point != object.points.end(); point++) {
+				points.push_back(*point);
+			}
+
+			for (vector<tuple<tuple<int, int, int>, Material>>::iterator triangle = object.triangles.begin(); triangle != object.triangles.end(); triangle++) {
+				triangles.push_back(*triangle);
+			}
+
+			return Object(points, triangles);
+		}
 
 		static Object loadFromFile(string folderPath) {
 			vector<vector3d> points;
@@ -182,6 +197,14 @@ class Object {
 
 			return Object(points, triangles);
 		}
+
+		void move(vector3d offset) {
+			for (vector<vector3d>::iterator point = points.begin(); point != points.end(); point++) {
+				point->x += offset.x;
+				point->y += offset.y;
+				point->z += offset.z;
+			}
+		}
 };
 
 class Camera {
@@ -218,13 +241,6 @@ class Engine {
 			vector3d v = camera.view1;
 			vector3d u = camera.view2;
 			vector3d o = {point.x-camera.center.x, point.y-camera.center.y, point.z-camera.center.z};
-
-			/*
-			 *    *a  *b  *c    = o
-			 *  | d.x v.x u.x |
-			 *  | d.y v.y u.y | = d.x*v.y*u.z+v.x*u.y*d.z+u.x*d.y*v.z-u.x*v.y*d.z-v.x*d.y*u.z-d.x*u.y*v.z
-			 * 	| d.z v.z u.z |
-			 */
 
 			float det =  d.x*v.y*u.z+v.x*u.y*d.z+u.x*d.y*v.z-u.x*v.y*d.z-v.x*d.y*u.z-d.x*u.y*v.z;
 			float aDet = o.x*v.y*u.z+v.x*u.y*o.z+u.x*o.y*v.z-u.x*v.y*o.z-v.x*o.y*u.z-o.x*u.y*v.z;
@@ -305,6 +321,9 @@ class Engine {
 				pair<vector2d, bool> xpointC = xpoints2d[c];
 
 				if (xpointA.second && xpointB.second && xpointC.second) {
+					
+					/* seting up variables */
+
 					Material material = get<1>(triangle);
 					olc::Pixel color = material.color;
 
@@ -330,6 +349,8 @@ class Engine {
 					vector3d point3dA;
 					vector3d point3dB;
 					vector3d point3dC;
+
+					/* sorting triangle points */
 
 					if (unspointA.y <= unspointB.y && unspointA.y <= unspointC.y) {
 						pointA = unspointA;
@@ -377,6 +398,8 @@ class Engine {
 						}
 					}
 
+					/* seting up variables */
+
 					int pointAx = (int) pointA.x;
 					int pointAy = (int) pointA.y;
 					int pointBx = (int) pointB.x;
@@ -393,6 +416,8 @@ class Engine {
 					vector2d u = {(float) pointBx-pointAx, (float) pointBy-pointAy};
 					vector2d v = {(float) pointCx-pointBx, (float) pointCy-pointBy};
 					float det = u.x*v.y-v.x*u.y;
+
+					/* drawing top half of triangle */
 
 					if (l1 > 0) {
 						float d1 = (pointAx-pointBx)/((float) (pointAy-pointBy));
@@ -433,6 +458,8 @@ class Engine {
 							}
 						}
 					}
+
+					/* drawing bottom half of triangle */
 
 					if (l2 > 0) {
 						float d2 = (pointBx-pointCx)/((float) (pointBy-pointCy));
@@ -478,6 +505,223 @@ class Engine {
 
 			delete[] depthBuffer;
 		}
+
+		void renderObjects(vector<Object> objects, olc::PixelGameEngine pgengine) {
+			int width = pgengine.ScreenWidth();
+			int height = pgengine.ScreenHeight();
+			float *depthBuffer = new float[width*height];
+
+			for (int x = 0; x < width; x++) {
+				for (int y = 0; y < height; y++) {
+					depthBuffer[y*width+x] = -1;
+				}
+			}
+
+			for (vector<Object>::iterator xobject = objects.begin(); xobject != objects.end(); xobject++) {
+				Object object = *xobject;
+
+				vector<vector3d> points3d = object.points;
+				vector<pair<vector2d, bool>> xpoints2d = calculatePoints(points3d);
+
+				// for (vector<tuple<tuple<int, int, int>, Material>>::iterator triangle = object.triangles.begin(); triangle != object.triangles.end(); ++triangle) {
+				for (int index = 0; index < object.triangles.size(); index++) {
+					tuple<tuple<int, int, int>, Material> triangle = object.triangles[index];
+
+					tuple<int, int, int> xtriangle = get<0>(triangle);
+					int a = get<0>(xtriangle);
+					int b = get<1>(xtriangle);
+					int c = get<2>(xtriangle);
+
+					pair<vector2d, bool> xpointA = xpoints2d[a];
+					pair<vector2d, bool> xpointB = xpoints2d[b];
+					pair<vector2d, bool> xpointC = xpoints2d[c];
+
+					if (xpointA.second && xpointB.second && xpointC.second) {
+						
+						/* seting up variables */
+
+						Material material = get<1>(triangle);
+						olc::Pixel color = material.color;
+
+						vector2d unspointA = xpointA.first;
+						vector2d unspointB = xpointB.first;
+						vector2d unspointC = xpointC.first;
+
+						unspointA.x *= width;
+						unspointB.x *= width;
+						unspointC.x *= width;
+						unspointA.y *= height;
+						unspointB.y *= height;
+						unspointC.y *= height;
+
+						vector2d pointA;
+						vector2d pointB;
+						vector2d pointC;
+
+						vector3d unspoint3dA = points3d[a];
+						vector3d unspoint3dB = points3d[b];
+						vector3d unspoint3dC = points3d[c];
+
+						vector3d point3dA;
+						vector3d point3dB;
+						vector3d point3dC;
+
+						/* sorting triangle points */
+
+						if (unspointA.y <= unspointB.y && unspointA.y <= unspointC.y) {
+							pointA = unspointA;
+							point3dA = unspoint3dA;
+							if (unspointB.y <= unspointC.y) {
+								pointB = unspointB;
+								point3dB = unspoint3dB;
+								pointC = unspointC;
+								point3dC = unspoint3dC;
+							} else {
+								pointB = unspointC;
+								point3dB = unspoint3dC;
+								pointC = unspointB;
+								point3dC = unspoint3dB;
+							}
+
+						} else if (unspointB.y <= unspointA.y && unspointB.y <= unspointC.y) {
+							pointA = unspointB;
+							point3dA = unspoint3dB;
+							if (unspointA.y <= unspointC.y) {
+								pointB = unspointA;
+								point3dB = unspoint3dA;
+								pointC = unspointC;
+								point3dC = unspoint3dC;
+							} else {
+								pointB = unspointC;
+								point3dB = unspoint3dC;
+								pointC = unspointA;
+								point3dC = unspoint3dA;
+							}
+
+						} else if (unspointC.y <= unspointB.y && unspointC.y <= unspointA.y) {
+							pointA = unspointC;
+							point3dA = unspoint3dC;
+							if (unspointB.y <= unspointA.y) {
+								pointB = unspointB;
+								point3dB = unspoint3dB;
+								pointC = unspointA;
+								point3dC = unspoint3dA;
+							} else {
+								pointB = unspointA;
+								point3dB = unspoint3dA;
+								pointC = unspointB;
+								point3dC = unspoint3dB;
+							}
+						}
+
+						/* seting up variables */
+
+						int pointAx = (int) pointA.x;
+						int pointAy = (int) pointA.y;
+						int pointBx = (int) pointB.x;
+						int pointBy = (int) pointB.y;
+						int pointCx = (int) pointC.x;
+						int pointCy = (int) pointC.y;
+
+						int l = pointCy-pointAy;
+						int l1 = pointBy-pointAy;
+						int l2 = pointCy-pointBy;
+	
+						float d = (pointAx-pointCx)/((float) (pointAy-pointCy));
+
+						vector2d u = {(float) pointBx-pointAx, (float) pointBy-pointAy};
+						vector2d v = {(float) pointCx-pointBx, (float) pointCy-pointBy};
+						float det = u.x*v.y-v.x*u.y;
+
+						/* drawing top half of triangle */
+
+						if (l1 > 0) {
+							float d1 = (pointAx-pointBx)/((float) (pointAy-pointBy));
+							float x1 = pointAx;
+							float x2 = pointAx;
+
+							bool dIsRight = d1 < d;
+
+							for (int y = pointAy; y <= pointBy; y++) {
+								for (int x = (int) x1; x <= (int) x2; x++) {
+									if (x >= 0 && x < width && y >= 0 && y < height) {
+										float kDet = (x-pointAx)*v.y-v.x*(y-pointAy);
+										float k = kDet/det;
+										float lDet = u.x*(y-pointAy)-(x-pointAx)*u.y;
+										float l = lDet/det;
+
+										float point3dx = point3dA.x+k*(point3dB.x-point3dA.x)+l*(point3dC.x-point3dB.x);
+										float point3dy = point3dA.y+k*(point3dB.y-point3dA.y)+l*(point3dC.y-point3dB.y);
+										float point3dz = point3dA.z+k*(point3dB.z-point3dA.z)+l*(point3dC.z-point3dB.z);
+
+										float pDistance = calculateDistance({point3dx, point3dy, point3dz});
+									
+										int depthBufferIndex = y*width+x;
+										if (depthBuffer[depthBufferIndex] > pDistance || depthBuffer[depthBufferIndex] == -1) {
+											pgengine.Draw(x, y, color);
+
+											depthBuffer[depthBufferIndex] = pDistance;
+										}
+									}
+								}
+
+								if (dIsRight) {
+									x1 += d1;
+									x2 += d;
+								} else {
+									x1 += d;
+									x2 += d1;
+								}
+							}
+						}
+
+						/* drawing bottom half of triangle */
+
+						if (l2 > 0) {
+							float d2 = (pointBx-pointCx)/((float) (pointBy-pointCy));
+							float x1 = pointCx;
+							float x2 = pointCx;
+
+							bool dIsRight = d2 < d;
+
+							for (int y = pointCy; y > pointBy; y--) {
+								for (int x = (int) x1; x <= (int) x2; x++) {
+									if (x >= 0 && x < width && y >= 0 && y < height) {
+										float kDet = (x-pointAx)*v.y-v.x*(y-pointAy);
+										float k = kDet/det;
+										float lDet = u.x*(y-pointAy)-(x-pointAx)*u.y;
+										float l = lDet/det;
+
+										float point3dx = point3dA.x+k*(point3dB.x-point3dA.x)+l*(point3dC.x-point3dB.x);
+										float point3dy = point3dA.y+k*(point3dB.y-point3dA.y)+l*(point3dC.y-point3dB.y);
+										float point3dz = point3dA.z+k*(point3dB.z-point3dA.z)+l*(point3dC.z-point3dB.z);
+
+										float pDistance = calculateDistance({point3dx, point3dy, point3dz});
+									
+										int depthBufferIndex = y*width+x;
+										if (depthBuffer[depthBufferIndex] > pDistance || depthBuffer[depthBufferIndex] == -1) {
+											pgengine.Draw(x, y, color);
+
+											depthBuffer[depthBufferIndex] = pDistance;
+										}
+									}
+								}
+
+								if (!dIsRight) {
+									x1 -= d2;
+									x2 -= d;
+								} else {
+									x1 -= d;
+									x2 -= d2;
+								}
+							}
+						}
+					}
+				}
+			}
+
+			delete[] depthBuffer;
+		}
 };
 
 
@@ -485,7 +729,10 @@ class Engine {
 class Demo : public olc::PixelGameEngine {
 	public:
 		Engine engine;
-		Object testingObject;
+		Object testingObject1;
+		Object testingObject2;
+		Object testingObject3;
+		Object testingObject4;
 
 		float cameraDistance;
 
@@ -503,7 +750,18 @@ class Demo : public olc::PixelGameEngine {
 
 			engine = Engine();
 
-			testingObject = Object::loadFromFile("Objects/spaceShip");
+			Object cube = Object::loadFromFile("Objects/cube");
+			Object spaceShip = Object::loadFromFile("Objects/spaceShip");
+
+			testingObject1 = Object::copy(spaceShip);
+			testingObject2 = Object::copy(spaceShip);
+			testingObject3 = Object::copy(spaceShip);
+			testingObject4 = Object::copy(cube);
+
+			testingObject1.move({5, 0, 0});
+			testingObject2.move({-5, 0, 0});
+			testingObject3.move({0, 5, 0});
+			testingObject4.move({0, -5, 0});
 
 			cameraDistance = 10;
 
@@ -537,7 +795,13 @@ class Demo : public olc::PixelGameEngine {
 
 			engine.setCamera(Camera(center, direction, view1, view2));
 
-			engine.renderObject(testingObject, *this);
+			vector<Object> testingObjects;
+			testingObjects.push_back(testingObject1);
+			testingObjects.push_back(testingObject2);
+			testingObjects.push_back(testingObject3);
+			testingObjects.push_back(testingObject4);
+
+			engine.renderObjects(testingObjects, *this);
 
 			bool update = false;
 
