@@ -1,0 +1,18 @@
+# Blender v2.79 (sub 0) OBJ File: ''
+# www.blender.org
+mtllib object.mtl
+o Cube
+v 0.500000 0.000000 0.000000
+v -0.500000 -0.200000 0.200000
+v -0.500000 -0.200000 -0.200000
+v -0.500001 0.200000 0.200000
+v -0.500000 0.200000 -0.200000
+usemtl Material.001
+s off
+f 4 3 2
+f 4 5 3
+usemtl Material.002
+f 1 2 3
+f 1 5 4
+f 1 4 2
+f 3 5 1
