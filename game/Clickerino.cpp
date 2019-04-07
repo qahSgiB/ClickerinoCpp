@@ -746,6 +746,11 @@ class Player {
 
 		int bullets;
 
+		float laserTime;
+		float laserTimeMax;
+		float laserReload;
+		float laserReloadTime;
+
 		int health;
 
 		int score;
@@ -764,6 +769,10 @@ class Player {
 			reloadTime = 0.5;
 
 			bullets = 8; 
+
+			laserTime = 0;
+			laserTimeMax = 2.5;
+			laserReload = 30;
 
 			health = 3;
 
@@ -847,13 +856,15 @@ class Player {
 			return result;
 		}
 
-		tuple<Laser, bool> shootLaser() {
+		tuple<Laser, bool> shootLaser(float elapsedTime) {
 			tuple<Laser, bool> result;
 			get<1>(result) = false;
 
-			if (true) {
+			if (laserTime < laserTimeMax) {
 				get<0>(result) = Laser(-12+3, y);
 				get<1>(result) = true;
+
+				laserTime += elapsedTime;
 			}
 
 			return result;
@@ -1030,6 +1041,9 @@ class GameState : public State {
 			blocks.clear();
 			blocks.shrink_to_fit();
 
+			lasers.clear();
+			lasers.shrink_to_fit();
+
 			nextBlock = 0;
 
 			tier = 0;
@@ -1178,7 +1192,7 @@ class GameState : public State {
 				}
 			}
 			if (pgengine->GetKey(olc::Key::DOWN).bHeld) {
-				tuple<Laser, bool> shotResult = player.shootLaser();
+				tuple<Laser, bool> shotResult = player.shootLaser(elapsedTime);
 				if (get<1>(shotResult)) {
 					lasers.push_back(get<0>(shotResult));
 				}
