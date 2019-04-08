@@ -7,6 +7,7 @@
         "cmath": "cpp",
         "vector": "cpp",
         "new": "cpp",
-        "utility": "cpp"
+        "utility": "cpp",
+        "functional": "cpp"
     }
 }
