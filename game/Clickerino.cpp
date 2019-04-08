@@ -704,33 +704,6 @@ class Bullet {
 		}
 };
 
-class Laser {
-	public:
-		float x;
-		float y;
-		float xVel;
-
-		Object drawObject;
-
-		Laser() {}
-
-		Laser(float x, float y): x(x), y(y) {
-			xVel = 70;
-
-			drawObject = Object::loadFromFile("Objects/laser");
-		}
-
-		void update(float elapsedTime) {
-			x += xVel*elapsedTime;
-
-			drawObject.setPos({x, y, 0});
-		}
-
-		bool end() {
-			return x > 60;
-		}
-};
-
 class Player {
 	public:
 		float y;
@@ -851,20 +824,6 @@ class Player {
 
 				get<0>(result) =  Bullet(-12+3, y);
 				get<1>(result) = true;
-			}
-
-			return result;
-		}
-
-		tuple<Laser, bool> shootLaser(float elapsedTime) {
-			tuple<Laser, bool> result;
-			get<1>(result) = false;
-
-			if (laserTime < laserTimeMax) {
-				get<0>(result) = Laser(-12+3, y);
-				get<1>(result) = true;
-
-				laserTime += elapsedTime;
 			}
 
 			return result;
@@ -1006,7 +965,6 @@ class GameState : public State {
 		Player player;
 		vector<Bullet> bullets;
 		vector<Block> blocks;
-		vector<Laser> lasers;
 
 		End end;
 
@@ -1041,9 +999,6 @@ class GameState : public State {
 			blocks.clear();
 			blocks.shrink_to_fit();
 
-			lasers.clear();
-			lasers.shrink_to_fit();
-
 			nextBlock = 0;
 
 			tier = 0;
@@ -1055,7 +1010,6 @@ class GameState : public State {
 			GameTier currentTier = tiers[tier];
 			vector<Bullet> newBullets;
 			vector<Block> newBlocks;
-			vector<Laser> newLasers;
 
 			/* player update */
 			player.update(elapsedTime);
@@ -1069,16 +1023,6 @@ class GameState : public State {
 				}
 			}
 			bullets = newBullets;
-
-			/* lasers update */
-			for (vector<Laser>::iterator laser = lasers.begin(); laser != lasers.end(); laser++) {
-				laser->update(elapsedTime);
-
-				if (!laser->end()) {
-					newLasers.push_back(*laser);
-				}
-			}
-			lasers = newLasers;
 
 			/* block update */
 			if (nextBlock > 0) {
@@ -1165,10 +1109,6 @@ class GameState : public State {
 				renderObjects.push_back(block->drawObject);
 			}
 
-			for (vector<Laser>::iterator laser = lasers.begin(); laser != lasers.end(); laser++) {
-				renderObjects.push_back(laser->drawObject);
-			}
-
 			renderObjects.push_back(end.drawObject);
 
 			engine.renderObjects(renderObjects, (*pgengine));
@@ -1189,12 +1129,6 @@ class GameState : public State {
 				tuple<Bullet, bool> shotResult = player.shot();
 				if (get<1>(shotResult)) {
 					bullets.push_back(get<0>(shotResult));
-				}
-			}
-			if (pgengine->GetKey(olc::Key::DOWN).bHeld) {
-				tuple<Laser, bool> shotResult = player.shootLaser(elapsedTime);
-				if (get<1>(shotResult)) {
-					lasers.push_back(get<0>(shotResult));
 				}
 			}
 
