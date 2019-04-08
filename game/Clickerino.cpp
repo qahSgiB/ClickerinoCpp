@@ -6,6 +6,7 @@
  *		convert pairs to tuples
  *		responsive desgin
  *		definitions and declarations (now implemanted only for Demo)
+ *  	base class for Bullet and Laser
  */
 
 #define OLC_PGE_APPLICATION
@@ -630,6 +631,24 @@ float randFloat(float min, float max, int decimalPlaces) {
 
 
 
+class CollideBox {
+	public:
+		float minX;
+		float maxX;
+		float minY;
+		float maxY;
+
+		CollideBox() {}
+
+		CollideBox(float  minX, float maxX, float minY, float maxY): minX(minX), maxX(maxX), minY(minY), maxY(maxY) {}
+
+		static bool collide(CollideBox collideBox1, CollideBox collideBox2) {
+			return collideBox1.minX <= collideBox2.maxX && collideBox1.maxX >= collideBox2.minX && 
+				   collideBox1.minY <= collideBox2.maxY && collideBox1.maxY >= collideBox2.minY;
+		}
+};
+
+
 class Block {
 	public:
 		float x;
@@ -665,6 +684,10 @@ class Block {
 		bool end() {
 			return x < -12+5+1.5;
 		}
+
+		CollideBox getCollideBox() {
+			return CollideBox(x-1.5, x+1.5, y-1.5, y+1.5);
+		}
 };
 
 class Bullet {
@@ -694,13 +717,11 @@ class Bullet {
 		}
 
 		bool collide(Block block) {
-			float blockMin = block.x-1.5;
-			float blockMax = block.x+1.5;
+			return CollideBox::collide(getCollideBox(), block.getCollideBox());
+		}
 
-			float xMin = x-0.5;
-			float xMax = x+0.5;
-
-			return xMin <= blockMax && xMax >= blockMin && abs(block.y-y) < 1.5+0.2;
+		CollideBox getCollideBox() {
+			return CollideBox(x-0.5, x+0.5, y-0.2, y+0.2);
 		}
 };
 
@@ -729,10 +750,20 @@ class Laser {
 		bool end() {
 			return x > 60;
 		}
+
+		bool collide(Block block) {
+			return CollideBox::collide(getCollideBox(), block.getCollideBox());
+		}
+
+		CollideBox getCollideBox() {
+			return CollideBox(x-2, x+2, y-0.125, y+0.125);
+		}
 };
 
 class Player {
 	public:
+		float x;
+
 		float y;
 		float yVel;
 		float maxYVel;
@@ -741,23 +772,30 @@ class Player {
 		float accDir;
 		float accN;
 
-		float reloading;
-		float reloadTime;
+		float bulletReloading;
+		float bulletReloadTime;
+		int bulletsCount;
+		bool bulletShot;
 
-		int bullets;
+		float laserStat;
+		float laserReloadVel;
+		float laserShootVel;
+		float laserReloadDelay;
+		float laserReloadDelayed;
+		bool laserStoppedShooting;
+		bool laserShot;
 
-		float laserTime;
-		float laserTimeMax;
-		float laserReload;
-		float laserReloadTime;
+		vector<Bullet> *bullets;
+		vector<Laser> *lasers;
 
 		int health;
-
 		int score;
 
 		Object drawObject;
 
-		Player() {
+		Player() {}
+
+		Player(float x, vector<Bullet> *bullets, vector<Laser> *lasers): x(x), bullets(bullets), lasers(lasers) {
 			y = 0;
 			yVel = 0;
 			maxYVel = 35;
@@ -765,14 +803,18 @@ class Player {
 			yAcc = 50;
 			accDir = 0;
 
-			reloading = 0;
-			reloadTime = 0.5;
+			bulletReloading = 0;
+			bulletReloadTime = 0.5;
+			bulletsCount = 8;
+			bulletShot = false;
 
-			bullets = 8; 
-
-			laserTime = 0;
-			laserTimeMax = 2.5;
-			laserReload = 30;
+			laserStat = 1;
+			laserReloadVel = 1.0/10;
+			laserShootVel = 1.0/2;
+			laserReloadDelay = 10;
+			laserReloadDelayed = 0;
+			laserStoppedShooting = false;
+			laserShot = false;
 
 			health = 3;
 
@@ -819,18 +861,65 @@ class Player {
 				yVel = 0;
 			}
 
-			if (reloading > 0) {
-				reloading -= elapsedTime;
-				if (reloading < 0) {
-					reloading = 0;
+			float angle = 35*(yVel/maxYVel);
+			drawObject.setRotation({2*3.14159f*(angle/360), 0, 0});
+			drawObject.setPos({x, y, 0});
+			
+			accDir = 0;
+
+			if (bulletReloading > 0) {
+				bulletReloading -= elapsedTime;
+				if (bulletReloading < 0) {
+					bulletReloading = 0;
 				}
 			}
 
-			float angle = 35*(yVel/maxYVel);
-			drawObject.setRotation({2*3.14159f*(angle/360), 0, 0});
-			drawObject.setPos({-12, y, 0});
-			
-			accDir = 0;
+			if (bulletShot) {
+				if (bulletReloading == 0 && bulletsCount > 0) {
+					Bullet bullet = Bullet(-12+3, y);
+					bullets->push_back(bullet);
+
+					bulletReloading = bulletReloadTime;
+					bulletsCount--;
+				}
+
+				bulletShot = false;
+			}
+
+			if (laserReloadDelayed == 0) {
+				if (laserShot && laserStat > 0 && !laserStoppedShooting) {
+					Laser laser = Laser(-12+3, y);
+					lasers->push_back(laser);
+
+					laserStat -= laserShootVel*elapsedTime;
+
+					if (laserStat < 0) {
+						laserStat = 0;
+					}
+				} else {
+					if (laserStat < 1) {
+						laserStoppedShooting = true;
+						laserStat += laserReloadVel*elapsedTime;
+
+						if (laserStat > 1) {
+							laserStat = 1;
+						}
+
+						if (laserStat == 1) {
+							laserReloadDelayed = laserReloadDelay;
+							laserStoppedShooting = false;
+						}
+					}
+				}
+			} else {
+				laserReloadDelayed -= elapsedTime;
+
+				if (laserReloadDelayed < 0) {
+					laserReloadDelayed = 0;
+				}
+			}
+		
+			laserShot = false;
 		}
 
 		void accLeft(float elapsedTime) {
@@ -841,37 +930,16 @@ class Player {
 			accDir = 1;
 		}
 
-		tuple<Bullet, bool> shot() {
-			tuple<Bullet, bool> result;
-			get<1>(result) = false;
-
-			if (reloading == 0 && bullets > 0) {
-				reloading = reloadTime;
-				bullets--;
-
-				get<0>(result) =  Bullet(-12+3, y);
-				get<1>(result) = true;
-			}
-
-			return result;
+		void shootBullet() {
+			bulletShot = true;
 		}
 
-		tuple<Laser, bool> shootLaser(float elapsedTime) {
-			tuple<Laser, bool> result;
-			get<1>(result) = false;
-
-			if (laserTime < laserTimeMax) {
-				get<0>(result) = Laser(-12+3, y);
-				get<1>(result) = true;
-
-				laserTime += elapsedTime;
-			}
-
-			return result;
+		void shootLaser() {
+			laserShot = true;
 		}
 
 		void destroydBlock() {
-			bullets += 3;
+			bulletsCount += 3;
 			score++;
 		}
 
@@ -890,7 +958,7 @@ class Player {
 		}
 
 		string getBulletString() {
-			return to_string(bullets);
+			return to_string(bulletsCount);
 		}
 
 		string getScoreString() {
@@ -906,12 +974,17 @@ class End {
 	public:
 		Object drawObject;
 
-		End() {
+		float x;
+		float z;
+
+		End() {}
+
+		End(float x, float z): x(x), z(z) {
 			drawObject = Object::loadFromFile("Objects/end");
 		}
 
 		void update() {
-			drawObject.setPos({-12+5+1, 0, -1-0.3});
+			drawObject.setPos({x+1, 0, z-0.3f});
 		}
 };
 
@@ -1003,15 +1076,16 @@ class GameState : public State {
 
 		Engine engine;
 
+		float minX;
+		float maxX;
+
 		Player player;
 		vector<Bullet> bullets;
-		vector<Block> blocks;
 		vector<Laser> lasers;
-
+		vector<Block> blocks;
 		End end;
 
 		float nextBlock;
-		float blockSpawnTime;
 
 		int tier;
 		vector<GameTier> tiers;
@@ -1020,29 +1094,31 @@ class GameState : public State {
 			name = "Game";
 
 			engine = Engine();
-			
-			blockSpawnTime = 3;
+
+			minX = -12;
+			maxX = 60;
 
 			tiers.push_back(GameTier( 4, 1.5, 1.9, 1.5, 2.5));
-			tiers.push_back(GameTier( 9, 1.7, 2.1, 1.4, 2.3));
-			tiers.push_back(GameTier(15, 1.9, 2.3, 1.3, 2.2));
-			tiers.push_back(GameTier(21, 2.1, 2.5, 1.2, 2.1));
-			tiers.push_back(GameTier(24, 2.3, 2.7, 1.1, 1.9));
+			tiers.push_back(GameTier( 9, 1.7, 2.1, 1.3, 2.1));
+			tiers.push_back(GameTier(15, 1.9, 2.3, 1.1, 1.9));
+			tiers.push_back(GameTier(20,   2, 2.5, 0.9, 1.7));
+			tiers.push_back(GameTier(25, 2.1, 2.6, 0.7, 1.5));
+			tiers.push_back(GameTier(30, 2.1, 2.7, 0.6, 1.3));
 		}
 
 		void onStart() {
-			player = Player();
+			player = Player(minX, &bullets, &lasers);
 
-			end = End();
+			end = End(minX+5, -1);
 
 			bullets.clear();
 			bullets.shrink_to_fit();
 
-			blocks.clear();
-			blocks.shrink_to_fit();
-
 			lasers.clear();
 			lasers.shrink_to_fit();
+
+			blocks.clear();
+			blocks.shrink_to_fit();
 
 			nextBlock = 0;
 
@@ -1054,11 +1130,13 @@ class GameState : public State {
 
 			GameTier currentTier = tiers[tier];
 			vector<Bullet> newBullets;
-			vector<Block> newBlocks;
 			vector<Laser> newLasers;
+			vector<Block> newBlocks;
 
 			/* player update */
 			player.update(elapsedTime);
+
+			bool gameEnd = player.end();
 
 			/* bullet update */
 			for (vector<Bullet>::iterator bullet = bullets.begin(); bullet != bullets.end(); bullet++) {
@@ -1084,7 +1162,13 @@ class GameState : public State {
 			if (nextBlock > 0) {
 				nextBlock -= elapsedTime;
 
-				if (nextBlock < 0 || blocks.size() == 0) {
+				if (blocks.size() == 0) {
+					if (nextBlock > 0.5) {
+						nextBlock = 0.5;
+					}
+				}
+
+				if (nextBlock < 0) {
 					nextBlock = 0;
 				}
 			}
@@ -1131,11 +1215,33 @@ class GameState : public State {
 			}
 			bullets = newBullets;
 
+			/* laser-block collisions */
+			newLasers.clear();
+			newLasers.shrink_to_fit();
+			for (vector<Laser>::iterator laser = lasers.begin(); laser != lasers.end(); laser++) {
+				bool collided = false;
+
+				newBlocks.clear();
+				newBlocks.shrink_to_fit();
+				for (vector<Block>::iterator block = blocks.begin(); block != blocks.end(); block++) {
+					if (laser->collide(*block)) {
+						collided = true;
+
+						player.destroydBlock();
+					} else {
+						newBlocks.push_back(*block);
+					}
+				}
+				blocks = newBlocks;
+
+				if (!collided) {
+					newLasers.push_back(*laser);
+				}
+			}
+			lasers = newLasers;
+
 			/* end update */
 			end.update();
-
-			/* player dead */
-			bool gameEnd = player.end();
 
 			/* tier update */
 			if (tier < tiers.size()-1) {
@@ -1186,16 +1292,10 @@ class GameState : public State {
 				player.accLeft(elapsedTime);
 			}
 			if (pgengine->GetKey(olc::Key::UP).bHeld) {
-				tuple<Bullet, bool> shotResult = player.shot();
-				if (get<1>(shotResult)) {
-					bullets.push_back(get<0>(shotResult));
-				}
+				player.shootBullet();
 			}
 			if (pgengine->GetKey(olc::Key::DOWN).bHeld) {
-				tuple<Laser, bool> shotResult = player.shootLaser(elapsedTime);
-				if (get<1>(shotResult)) {
-					lasers.push_back(get<0>(shotResult));
-				}
+				player.shootLaser();
 			}
 
 			/* state changing */
