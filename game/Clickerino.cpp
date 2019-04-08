@@ -719,11 +719,6 @@ class Player {
 
 		int bullets;
 
-		float laserTime;
-		float laserTimeMax;
-		float laserReload;
-		float laserReloadTime;
-
 		int health;
 
 		int score;
@@ -741,11 +736,7 @@ class Player {
 			reloading = 0;
 			reloadTime = 0.5;
 
-			bullets = 8; 
-
-			laserTime = 0;
-			laserTimeMax = 2.5;
-			laserReload = 30;
+			bullets = 8;
 
 			health = 3;
 
