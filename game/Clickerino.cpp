@@ -1,6 +1,8 @@
 /* 
  *	Powershell command to run this:
  * 		g++ Clickerino.cpp -o a.exe -std=c++11 -lgdiplus -lgdi32 -lopengl32 -lglu32; .\a.exe
+ *  (Linux/Ubuntu) terminal command to run this:
+ * 		g++ -o a.exe Clickerino.cpp -lX11 -lGL -lpthread -lpng; vblank_mode=0 ./a.exe
  * 
  *	ToDo:
  *		convert pairs to tuples
